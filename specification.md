@@ -10,8 +10,8 @@ HTML generated from Sparkdown must have context-aware classes for CSS and IDs fo
 That is, social media is its own thing.
 - Validation of social media handles
 - Optional embed of Tweets, etc
-`T@username` becomes `<a href="//twitter.com/username" class="twitter-handle">@username</a>`
-`F@username` becomes `<a href="//facebook.com/username" class="facebook-handle">username on Facebook<a>`
+  - `T@username` becomes `<a href="//twitter.com/username" class="twitter-handle">@username</a>`
+  - `F@username` becomes `<a href="//facebook.com/username" class="facebook-handle">username on Facebook<a>`
 
 ## Rich media
 Embedding audio, video is easy and context-aware.

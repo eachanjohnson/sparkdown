@@ -5,6 +5,6 @@ As the web evolves, skill with CSS and Javascript is increasingly required for s
 
 Markdown is successful because it allows HTML to be generated from a natural, distraction-free writing enviroment. The Sparkdown project aims to take that idea and expands it for the modern web, bringing easy media embed, style, and interaction all from a natural writing environment. All while being backwards-compatible.
 
-# Current status
+## Current status
 - Defining specification
 - Writing parser

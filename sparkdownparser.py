@@ -55,7 +55,7 @@ class Buffer(object):
             new_line = self.file.readline()
         if counter < self.memory_size:
             self.eof = True
-            return 'eof'
+            return '\e\o\f'
         else:
             self.memory += '\n'
             return 'full'
@@ -72,6 +72,7 @@ class Buffer(object):
         else:
             self.memory = self.memory[1:]
             #print 'supplied ', char
+            #print char
             return char
 
 
@@ -121,35 +122,40 @@ class Rulebook(object):
         self.tokens = {
             '#': {
                     ' ': {
-                        1: '<h1>',
-                        2: '<h2>',
-                        3: '<h3>',
-                        4: '<h4>',
-                        5: '<h5>'
+                        1: domtools.H1,
+                        2: domtools.H2,
+                        3: domtools.H3,
+                        4: domtools.H4,
+                        5: domtools.H5
                     }
             },
             '-': {
                 '\n': {
-                    3: domtools.Strong
+                    3: domtools.Hr
                 }
             },
             '*': {
                 '\n': {
-                    3: '<hr>'
+                    3: domtools.Hr
                 },
                 ' ': {
-                    n: '<strong>' for n in xrange(1, 3)
+                    n: domtools.Strong for n in xrange(1, 3)
                 },
-                '::::': {
-                    n: '<strong>' for n in xrange(1, 3)
+                'alpha': {
+                    n: domtools.Strong for n in xrange(1, 3)
                 }
             },
             '_': {
                 ' ': {
-                    n: '<em>' for n in xrange(1, 3)
+                    n: domtools.Em for n in xrange(1, 3)
                 },
-                '::::': {
-                    n: '<em>' for n in xrange(1, 3)
+                'alpha': {
+                    n: domtools.Em for n in xrange(1, 3)
+                }
+            },
+            '\n': {
+                'alpha': {
+                    n: domtools.P for n in xrange(2, 1000)
                 }
             }
         }
@@ -175,21 +181,23 @@ class Grammar(object):
         '''
         current_char = stack.get_current_char()
         #print self.listening, self.current_token_count, current_char
-        return_string = ''
+        return_string = ['']
         if current_char in self.rulebook.tokens:
             if not self.listening:
                 self.current_token = current_char
                 self.listening = True
-                self.current_token_count += 1
+                self.current_token_count = 1
             elif current_char == self.current_token:
                 self.current_token_count += 1
                 if self.current_token_count > stack.size:
-                    return_string = self.current_token_count * self.current_token
+                    return_string[0] = self.current_token_count * self.current_token
                     self.current_token = ''
                     self.current_token_count = 0
                     self.listening = False
             else:
-                pass
+                self.current_token = current_char
+                self.listening = True
+                self.current_token_count = 1
         elif self.listening:
             try:
                 terminator_tree = self.rulebook.tokens[self.current_token]
@@ -199,20 +207,21 @@ class Grammar(object):
                 try:
                     import string
                     if current_char in string.letters + '.,;:"\'':
-                        current_char2 = '::::'
+                        current_char2 = 'alpha'
                     else:
                         current_char2 = current_char
                         current_char = ''
                     number_tree = terminator_tree[current_char2]
                 except KeyError:
                     print '{} not a terminator for {}'.format(current_char, self.current_token)
-                    return_string = current_char
+                    return_string[0] = current_char
                     self.current_token = ''
                     self.current_token_count = 0
                     self.listening = False
                 else:
                     try:
-                        return_string = number_tree[self.current_token_count] + current_char
+                        return_string = [number_tree[self.current_token_count], current_char,
+                                         self.current_token, self.current_token_count]
                     except KeyError:
                         print '{} x {} not a rule'.format(self.current_token_count, current_char)
                         return_string = self.current_token_count * self.current_token + current_char
@@ -224,9 +233,10 @@ class Grammar(object):
                         self.current_token_count = 0
                         self.listening = False
         else:
-            return_string = current_char
-        print self.listening, self.current_token_count, '"{}"'.format(current_char), return_string
-        return return_string
+            return_string[0] = current_char
+        #print self.listening, self.current_token_count, '"{}"'.format(current_char), return_string
+        return tuple(return_string)
+
 
 class Parser(object):
 
@@ -244,41 +254,44 @@ class Parser(object):
         self.string_out = ''
         self.stack = Stack(size=self.lookahead)
         self.grammar = grammar
-        self.current_element = None
+        self.current_element = self.dom
 
     def parse(self):
         while True:
             try:
                 new_char = self.buffer.get_char()
             except EOFError:
+                #print 'eof'
                 while len(self.stack.stack) > 0:
                     self.stack.stack.pop(0)
                     out_element = self.grammar.lookup(self.stack)
                     try:
-                        #print self.stack.get_stack_string()
-                        self.dom.append(out_element)
-                    except TypeError:
-                        try:
-                            self.current_element.text += out_element
-                        except EOFError:
-                            self.current_element = self.current_element.parent
+                        element, char = out_element
+                    except ValueError:
+                        #print out_element[0]
+                        self.current_element.append(out_element[0])
                     else:
-                        self.current_element = out_element
-                        return self.dom
+                        self.current_element = self.current_element.append(
+                            element(text=char, parent=self.current_element)
+                        )
+                        print self.current_element.tag
+                break
             else:
                 self.stack.push(char=new_char)
                 out_element = self.grammar.lookup(self.stack)
+                #print self.stack.get_stack_string()
+                #print out_element, self.current_element
                 try:
-                    #print self.stack.get_stack_string()
-                    self.dom.append(out_element)
-                except TypeError:
-                    try:
-                        self.current_element.text += out_element
-                    except EOFError:
-                        self.current_element = self.current_element.parent
+                    #print out_element
+                    element, char, token, tokenx = out_element
+                except ValueError:
+                    #print out_element[0]
+                    self.current_element = self.current_element.append(out_element[0])
                 else:
-                    self.current_element = out_element
-
+                    el = element(text=char, parent=self.current_element, token=token, tokenx=tokenx)
+                    #print 'Trying to append ', el.tag, isinstance(el, domtools.Element)
+                    self.current_element = self.current_element.append(el)
+                    print self.current_element.tag
 
 
 ## Define functions
@@ -295,7 +308,7 @@ def main():
 
     parser.parse()
 
-    print parser.string_out
+    print parser.dom
 
     return None
 

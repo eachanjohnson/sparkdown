@@ -27,15 +27,20 @@ Options:
 ## Define classes
 class Element(object):
 
-    def __init__(self, tag, text='', parent):
+    def __init__(self, tag, parent, text='', token='', tokenx=0):
         self.tag = tag
+        self.open_tag = '<{}>'.format(self.tag)
+        self.close_tag = '</{}>'.format(self.tag)
+        self.token = token
+        self.tokenx = tokenx
         self.kind = self.get_kind()
         self.id = []
         self.classes = []
-        self.terminator = get_terminator()
-        self.text = text
-        self.children = []
+        self.terminator, self.parent_to_skip = self.get_terminator()
+        self.children = [text]
         self.parent = parent
+        self.skip = 0
+        #print self.__dict__
 
     def get_kind(self):
         inline_set = {'br', 'span', 'strong', 'em', 'hr'}
@@ -45,70 +50,127 @@ class Element(object):
             return 'block'
 
     def get_terminator(self):
-        import string
         d = {
-            'h1': '\n',
-            'h2': '\n',
-            'strong': ' ,.;:' + string.letters,
-            'em': ' ,.;:' + string.letters,
-            'hr': '\n'
+            'h1': ('\n', 0),
+            'h2': ('\n', 0),
+            'h3': ('\n', 0),
+            'h4': ('\n', 0),
+            'h5': ('\n', 0),
+            'strong': (self.token, self.tokenx),
+            'em': (self.token, self.tokenx),
+            'hr': ('\n', 0),
+            'p': ('\n', 0)
         }
         try:
             return d[self.tag]
         except KeyError:
-            return ''
+            return ('eof', 0)
 
     def append(self, element):
-        if type(Element) == Element:
-            self.children.append(element)
-            return element
+        #print element
+        if isinstance(element, Element):
+            if element.token != self.terminator:
+                if self.skip == 0:
+                    print 'Appending', element.tag
+                    self.children.append(element)
+                    return self.children[-1]
+                else:
+                    return self
+            else:
+                print 'Terminating', self.tag, 'because of "', element, '" which matches', self.terminator
+                print 'Moving up to', self.parent.tag
+                self.parent.skip = self.parent_to_skip
+                return self.parent.append(element)
+        elif type(element) == str:
+            if element == self.terminator:
+                print 'Terminating', self.tag, 'because of "', element, '" which matches', self.terminator
+                print 'Moving up to', self.parent.tag
+                self.parent.skip = self.parent_to_skip
+                return self.parent.append(element)
+            else:
+                #print 'Appending', self.children[-1]
+                if self.skip == 0:
+                    try:
+                        self.children[-1] += element
+                    except Exception:
+                        self.children.append(element)
+                else:
+                    self.skip -= 1
+                return self
         else:
-            raise TypeError
+            return self
+
+    def __str__(self):
+        out = '{}{}{}'.format(self.open_tag, ''.join([str(child) for child in self.children]), self.close_tag)
+        return out
 
 
 class DOM(Element):
 
     def __init__(self, text=''):
-        Element.__init__(self, tag='h1', text=text, parent=None)
+        Element.__init__(self, tag='dom', text=text, parent=None)
+        self.close_tag = ''
+        self.open_tag = ''
 
 
 class H1(Element):
 
-    def __init__(self, text, parent):
+    def __init__(self, parent, text='', token='', tokenx=0):
         Element.__init__(self, tag='h1', text=text, parent=parent)
+        print self.token
 
 
 class H2(Element):
 
-    def __init__(self, text, parent):
+    def __init__(self, parent, token='', text='', tokenx=0):
         Element.__init__(self, tag='h2', text=text, parent=parent)
+
+class H3(Element):
+
+    def __init__(self, parent, token='', text='', tokenx=0):
+        Element.__init__(self, tag='h3', text=text, parent=parent)
+
+class H4(Element):
+
+    def __init__(self, parent, token='', text='', tokenx=0):
+        Element.__init__(self, tag='h4', text=text, parent=parent)
+
+class H5(Element):
+
+    def __init__(self, parent, token='', text='', tokenx=0):
+        Element.__init__(self, tag='h5', text=text, parent=parent)
 
 
 class Strong(Element):
 
-    def __init__(self, text, parent):
-        Element.__init__(self, tag='strong', text=text, parent=parent)
+    def __init__(self, parent, token, tokenx, text=''):
+        Element.__init__(self, tag='strong', text=text, parent=parent, token=token, tokenx=tokenx)
 
 
 class Em(Element):
 
-    def __init__(self, text, parent):
-        Element.__init__(self, tag='em', text=text, parent=parent)
+    def __init__(self, parent, token, tokenx, text=''):
+        Element.__init__(self, tag='em', text=text, parent=parent, token=token, tokenx=tokenx)
 
 
 class Hr(Element):
 
-    def __init__(self, text):
-        Element.__init__(self, tag='hr', text=text)
+    def __init__(self, parent, token='', text='', tokenx=0):
+        Element.__init__(self, tag='hr', text=text, parent=parent)
+        self.close_tag = ''
 
-class Text(Element):
 
-    def __init__(self, text):
-        Element.__init__(self, tag='', text=text)
+class Br(Element):
 
-    def append(self, element):
-        raise TypeError
+    def __init__(self, parent, token='', text='', tokenx=0):
+        Element.__init__(self, tag='br', text=text, parent=parent)
+        self.close_tag = ''
 
+
+class P(Element):
+
+    def __init__(self, parent, token='', text='', tokenx=0):
+        Element.__init__(self, tag='p', text=text, parent=parent)
 
 
 
